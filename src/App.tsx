@@ -5,7 +5,7 @@ import './App.css';
 type BaseFileDictionary = { identifier: string; value: string }[];
 
 const csfRowPattern =
-    /<CSFFILE[0-9]+>[0-9,.]+&quot;.*\.CSF&quot;,&quot;.*\.jsf&quot;,&quot;&quot;,[0-9]+,[0-9]+<\/CSFFILE[0-9]+>/;
+    /<CSFFILE[0-9]+>[0-9,.]+&quot;.*\.CSF&quot;.*&quot;.*\.jsf&quot;.*&quot;.*&quot;,[0-9]+,[0-9]+<\/CSFFILE[0-9]+>/;
 
 const csfIdentifierPattern = /[A-Z_.0-9]+\.jsf/;
 const csfValuePattern = /,[0-9]+<\/CSFFILE/;
@@ -58,9 +58,7 @@ function App() {
 
                 const baseFileRow = baseFileDictionary.find((row) => row.identifier === identifier);
 
-                if (!baseFileRow) {
-                    throw new Error('Mismatched identifiers');
-                }
+                if (!baseFileRow) return line;
 
                 return line.replace(/,[0-9]+<\/CSFFILE/, `,${baseFileRow.value}</CSFFILE`);
             })

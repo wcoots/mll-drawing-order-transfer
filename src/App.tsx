@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import FileUploadSingle from './FileUploadSingle';
 import './App.css';
 
@@ -14,6 +14,9 @@ function App() {
     const [baseFile, setBaseFile] = useState<File>();
     const [targetFile, setTargetFile] = useState<File>();
     const [processedTargetFileText, setProcessedTargetFileText] = useState<string>();
+
+    const [filesProcessable, setFilesProcessable] = useState(false);
+    const [fileProcessError, setFileProcessError] = useState<string>();
 
     function processBaseFile(fileText: string): BaseFileDictionary {
         const fileTextByLine = fileText.split('\n');
@@ -85,31 +88,50 @@ function App() {
     }
 
     async function processFiles() {
-        if (!baseFile || !targetFile) {
-            return;
+        try {
+            if (!baseFile || !targetFile) {
+                return;
+            }
+
+            setFileProcessError(undefined);
+
+            const [baseFileText, targetFileText] = await Promise.all([
+                baseFile.text(),
+                targetFile.text()
+            ]);
+
+            const baseFileDictionary = processBaseFile(baseFileText);
+
+            processTargetFile(targetFileText, baseFileDictionary);
+        } catch (error) {
+            setFileProcessError((error as Error).message);
         }
-
-        const [baseFileText, targetFileText] = await Promise.all([
-            baseFile.text(),
-            targetFile.text()
-        ]);
-
-        const baseFileDictionary = processBaseFile(baseFileText);
-
-        processTargetFile(targetFileText, baseFileDictionary);
     }
+
+    useEffect(() => {
+        if (baseFile && targetFile) {
+            setFilesProcessable(true);
+        }
+    }, [baseFile, targetFile]);
 
     return (
         <div className="App">
             <p>Base file</p>
             {FileUploadSingle(setBaseFile)}
-
+            <hr />
             <p>Target file</p>
             {FileUploadSingle(setTargetFile)}
-
-            <button onClick={async () => await processFiles()}>Merge files</button>
-
-            <button onClick={downloadProcessedFile}>Download</button>
+            <hr />
+            <button onClick={async () => await processFiles()} disabled={!filesProcessable}>
+                Merge files
+            </button>
+            {fileProcessError ? <p className="error-text">{fileProcessError}</p> : <span />}
+            <hr />
+            <button
+                onClick={downloadProcessedFile}
+                disabled={!processedTargetFileText || !!fileProcessError}>
+                Download
+            </button>
         </div>
     );
 }

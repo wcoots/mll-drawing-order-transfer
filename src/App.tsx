@@ -1,23 +1,115 @@
-import React from 'react';
-import logo from './logo.svg';
+import { useState } from 'react';
+import FileUploadSingle from './FileUploadSingle';
 import './App.css';
 
+type BaseFileDictionary = { identifier: string; value: string }[];
+
+const csfRowPattern =
+    /<CSFFILE[0-9]+>[0-9,.]+&quot;.*\.CSF&quot;,&quot;.*\.jsf&quot;,&quot;&quot;,[0-9]+,[0-9]+<\/CSFFILE[0-9]+>/;
+
+const csfIdentifierPattern = /[A-Z_.0-9]+\.jsf/;
+const csfValuePattern = /,[0-9]+<\/CSFFILE/;
+
 function App() {
+    const [baseFile, setBaseFile] = useState<File>();
+    const [targetFile, setTargetFile] = useState<File>();
+    const [processedTargetFileText, setProcessedTargetFileText] = useState<string>();
+
+    function processBaseFile(fileText: string): BaseFileDictionary {
+        const fileTextByLine = fileText.split('\n');
+
+        return fileTextByLine.reduce((baseFileDictionary: BaseFileDictionary, line) => {
+            const isRecognisedCsfRow = csfRowPattern.test(line);
+
+            if (!isRecognisedCsfRow) {
+                if (line.includes('<CSFFILE')) throw new Error('Unrecognised CSF row pattern');
+                else return baseFileDictionary;
+            }
+
+            // @ts-ignore
+            const [identifier] = csfIdentifierPattern.exec(line);
+
+            // @ts-ignore
+            const [valueSection] = csfValuePattern.exec(line);
+
+            const value = valueSection.replace(/[^0-9]/g, '');
+
+            return [...baseFileDictionary, { identifier, value }];
+        }, []);
+    }
+
+    function processTargetFile(fileText: string, baseFileDictionary: BaseFileDictionary) {
+        const fileTextByLine = fileText.split('\n');
+
+        const processedFileText = fileTextByLine
+            .map((line) => {
+                const isRecognisedCsfRow = csfRowPattern.test(line);
+
+                if (!isRecognisedCsfRow) {
+                    if (line.includes('<CSFFILE')) throw new Error('Unrecognised CSF row pattern');
+                    else return line;
+                }
+
+                // @ts-ignore
+                const [identifier] = csfIdentifierPattern.exec(line);
+
+                const baseFileRow = baseFileDictionary.find((row) => row.identifier === identifier);
+
+                if (!baseFileRow) {
+                    throw new Error('Mismatched identifiers');
+                }
+
+                return line.replace(/,[0-9]+<\/CSFFILE/, `,${baseFileRow.value}</CSFFILE`);
+            })
+            .join('\n');
+
+        setProcessedTargetFileText(processedFileText);
+    }
+
+    function downloadProcessedFile() {
+        if (!processedTargetFileText) {
+            return;
+        }
+
+        const element = document.createElement('a');
+        element.setAttribute(
+            'href',
+            'data:text/plain;charset=utf-8,' + encodeURIComponent(processedTargetFileText)
+        );
+        element.setAttribute('download', 'target.mll');
+
+        element.style.display = 'none';
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+    }
+
+    async function processFiles() {
+        if (!baseFile || !targetFile) {
+            return;
+        }
+
+        const [baseFileText, targetFileText] = await Promise.all([
+            baseFile.text(),
+            targetFile.text()
+        ]);
+
+        const baseFileDictionary = processBaseFile(baseFileText);
+
+        processTargetFile(targetFileText, baseFileDictionary);
+    }
+
     return (
         <div className="App">
-            <header className="App-header">
-                <img src={logo} className="App-logo" alt="logo" />
-                <p>
-                    Edit <code>src/App.tsx</code> and save to reload.
-                </p>
-                <a
-                    className="App-link"
-                    href="https://reactjs.org"
-                    target="_blank"
-                    rel="noopener noreferrer">
-                    Learn React
-                </a>
-            </header>
+            <p>Base file</p>
+            {FileUploadSingle(setBaseFile)}
+
+            <p>Target file</p>
+            {FileUploadSingle(setTargetFile)}
+
+            <button onClick={async () => await processFiles()}>Merge files</button>
+
+            <button onClick={downloadProcessedFile}>Download</button>
         </div>
     );
 }

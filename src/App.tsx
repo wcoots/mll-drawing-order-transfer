@@ -17,6 +17,7 @@ function App() {
 
     const [filesProcessable, setFilesProcessable] = useState(false);
     const [fileProcessError, setFileProcessError] = useState<string>();
+    const [fileDownloadable, setFileDownloadable] = useState(false);
 
     function processBaseFile(fileText: string): BaseFileDictionary {
         const fileTextByLine = fileText.split('\n');
@@ -77,7 +78,7 @@ function App() {
             'href',
             'data:text/plain;charset=utf-8,' + encodeURIComponent(processedTargetFileText)
         );
-        element.setAttribute('download', 'target.mll');
+        element.setAttribute('download', 'target.mml');
 
         element.style.display = 'none';
         document.body.appendChild(element);
@@ -87,11 +88,13 @@ function App() {
 
     async function processFiles() {
         try {
+            setFileDownloadable(false);
+            setFileProcessError(undefined);
+
             if (!baseFile || !targetFile) {
+                setFilesProcessable(false);
                 return;
             }
-
-            setFileProcessError(undefined);
 
             const [baseFileText, targetFileText] = await Promise.all([
                 baseFile.text(),
@@ -101,6 +104,7 @@ function App() {
             const baseFileDictionary = processBaseFile(baseFileText);
 
             processTargetFile(targetFileText, baseFileDictionary);
+            setFileDownloadable(true);
         } catch (error) {
             setFileProcessError((error as Error).message);
         }
@@ -108,12 +112,21 @@ function App() {
 
     useEffect(() => {
         if (baseFile && targetFile) {
-            setFilesProcessable(true);
+            if (baseFile.name.endsWith('.mml') && targetFile.name.endsWith('.mml')) {
+                setFilesProcessable(true);
+                setFileProcessError(undefined);
+            } else {
+                setFileProcessError('Unrecongnised file type');
+                setFilesProcessable(false);
+                setFileDownloadable(false);
+            }
         }
     }, [baseFile, targetFile]);
 
     return (
         <div className="App">
+            <h1>.mml file draw order transfer tool</h1>
+            <hr />
             <p>Base file</p>
             {FileUploadSingle(setBaseFile)}
             <hr />
@@ -125,9 +138,7 @@ function App() {
             </button>
             {fileProcessError ? <p className="error-text">{fileProcessError}</p> : <span />}
             <hr />
-            <button
-                onClick={downloadProcessedFile}
-                disabled={!processedTargetFileText || !!fileProcessError}>
+            <button onClick={downloadProcessedFile} disabled={!fileDownloadable}>
                 Download
             </button>
         </div>

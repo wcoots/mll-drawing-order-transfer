@@ -1,4 +1,5 @@
 import { ChangeEvent } from 'react';
+import './index.css';
 
 function FileUploadSingle(setFile: React.Dispatch<React.SetStateAction<File | undefined>>) {
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {

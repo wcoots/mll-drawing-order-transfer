@@ -24,6 +24,7 @@ function App() {
             if (baseFile.name.endsWith('.mml') && targetFile.name.endsWith('.mml')) {
                 setFilesProcessable(true);
                 setFileProcessError(undefined);
+                setFileDownloadable(false);
             } else {
                 setFileProcessError('Unrecongnised file type');
                 setFilesProcessable(false);
@@ -124,23 +125,42 @@ function App() {
     }
 
     return (
-        <div className="App">
-            <h1>.mml file draw order transfer tool</h1>
-            <hr />
-            <p>Base file</p>
-            {FileUploadSingle(setBaseFile)}
-            <hr />
-            <p>Target file</p>
-            {FileUploadSingle(setTargetFile)}
-            <hr />
-            <button onClick={async () => await processFiles()} disabled={!filesProcessable}>
-                Merge files
-            </button>
-            {fileProcessError ? <p className="error-text">{fileProcessError}</p> : <span />}
-            <hr />
-            <button onClick={downloadProcessedFile} disabled={!fileDownloadable}>
-                Download
-            </button>
+        <div className="container">
+            <div className="header">
+                <b>.mml file draw order transfer tool</b>
+                <a
+                    href="https://github.com/wcoots/mml-draw-order-transfer-tool"
+                    target="_blank"
+                    rel="noreferrer">
+                    GitHub
+                </a>
+            </div>
+            <div className="sub-container">
+                <div className="upload">
+                    <b>Base file</b>
+                    {FileUploadSingle(setBaseFile)}
+                </div>
+                <div className="upload">
+                    <b>Target file</b>
+                    {FileUploadSingle(setTargetFile)}
+                </div>
+            </div>
+            <hr className="divider" />
+            <div className="sub-container">
+                <button
+                    className="action-button"
+                    onClick={async () => await processFiles()}
+                    disabled={!filesProcessable}>
+                    Merge files
+                </button>
+                {fileProcessError ? <b className="error-text">{fileProcessError}</b> : <span />}
+                <button
+                    className="action-button"
+                    onClick={downloadProcessedFile}
+                    disabled={!fileDownloadable}>
+                    Download
+                </button>
+            </div>
         </div>
     );
 }

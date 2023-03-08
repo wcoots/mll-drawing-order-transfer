@@ -17,7 +17,6 @@ code {
     padding: 20px;
     font-family: Arial, sans-serif;
     font-size: 16px;
-    color: #333;
 }
 
 .header {
@@ -49,8 +48,8 @@ code {
 }
 
 .action-button {
-    background-color: #007bff;
-    color: #fff;
+    background-color: dodgerblue;
+    color: white;
     border: none;
     padding: 10px 20px;
     border-radius: 5px;
@@ -67,4 +66,9 @@ code {
 .error-text {
     padding-top: 10px;
     color: red;
+}
+
+.success-text {
+    padding-top: 10px;
+    color: limegreen;
 }

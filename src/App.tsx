@@ -1,14 +1,7 @@
 import { useState, useEffect } from 'react';
-import FileUploadSingle from './FileUploadSingle';
+import FileUpload from './FileUpload';
+import { processSourceFile, processDestionationFile } from './processers';
 import './index.css';
-
-type SourceFileDictionary = { identifier: string; value: string }[];
-
-const csfRowPattern =
-    /<CSFFILE[0-9]+>[0-9,.]+&quot;.*\.CSF&quot;.*&quot;.*\.jsf&quot;.*&quot;.*&quot;,[0-9]+,[0-9]+<\/CSFFILE[0-9]+>/;
-
-const csfIdentifierPattern = /[A-Z_.0-9]+\.jsf/;
-const csfValuePattern = /,[0-9]+<\/CSFFILE/;
 
 function App() {
     const [sourceFile, setSourceFile] = useState<File>();
@@ -18,75 +11,28 @@ function App() {
     const [filesProcessable, setFilesProcessable] = useState(false);
     const [fileDownloadable, setFileDownloadable] = useState(false);
 
+    const [successMessage, setSuccessMessage] = useState<string>();
     const [errorMessage, setErrorMessage] = useState<string>();
+
     useEffect(() => {
+        setFilesProcessable(false);
+        setFileDownloadable(false);
+        setSuccessMessage(undefined);
+        setErrorMessage(undefined);
+
         if (sourceFile && destinationFile) {
             if (sourceFile.name.endsWith('.mml') && destinationFile.name.endsWith('.mml')) {
                 setFilesProcessable(true);
-                setFileDownloadable(false);
-                setErrorMessage(undefined);
             } else {
-                setFilesProcessable(false);
-                setFileDownloadable(false);
                 setErrorMessage('Unrecongnised file type');
             }
         }
     }, [sourceFile, destinationFile]);
 
-    function processSourceFile(fileText: string): SourceFileDictionary {
-        const fileTextByLine = fileText.split('\n');
-
-        return fileTextByLine.reduce((sourceFileDictionary: SourceFileDictionary, line) => {
-            const isRecognisedCsfRow = csfRowPattern.test(line);
-
-            if (!isRecognisedCsfRow) {
-                if (line.includes('<CSFFILE')) throw new Error('Unrecognised CSF row pattern');
-                else return sourceFileDictionary;
-            }
-
-            // @ts-ignore
-            const [identifier] = csfIdentifierPattern.exec(line);
-
-            // @ts-ignore
-            const [valueSection] = csfValuePattern.exec(line);
-
-            const value = valueSection.replace(/[^0-9]/g, '');
-
-            return [...sourceFileDictionary, { identifier, value }];
-        }, []);
-    }
-
-    function processDestionationFile(fileText: string, sourceFileDictionary: SourceFileDictionary) {
-        const fileTextByLine = fileText.split('\n');
-
-        const processedFileText = fileTextByLine
-            .map((line) => {
-                const isRecognisedCsfRow = csfRowPattern.test(line);
-
-                if (!isRecognisedCsfRow) {
-                    if (line.includes('<CSFFILE')) throw new Error('Unrecognised CSF row pattern');
-                    else return line;
-                }
-
-                // @ts-ignore
-                const [identifier] = csfIdentifierPattern.exec(line);
-
-                const sourceFileRow = sourceFileDictionary.find(
-                    (row) => row.identifier === identifier
-                );
-
-                if (!sourceFileRow) return line;
-
-                return line.replace(/,[0-9]+<\/CSFFILE/, `,${sourceFileRow.value}</CSFFILE`);
-            })
-            .join('\n');
-
-        setProcessedDestinationFileText(processedFileText);
-    }
-
     async function processFiles() {
         try {
             setFileDownloadable(false);
+            setSuccessMessage(undefined);
             setErrorMessage(undefined);
 
             if (!sourceFile || !destinationFile) {
@@ -99,11 +45,18 @@ function App() {
                 destinationFile.text()
             ]);
 
-            const sourceFileDictionary = processSourceFile(sourceFileText);
+            const sourceFileDrawOrderDictionary = processSourceFile(sourceFileText);
 
-            processDestionationFile(destinationFileText, sourceFileDictionary);
+            const { processedFileText, linesAffected } = processDestionationFile(
+                destinationFileText,
+                sourceFileDrawOrderDictionary
+            );
+
+            setProcessedDestinationFileText(processedFileText);
+            setSuccessMessage(`${linesAffected} lines affected`);
             setFileDownloadable(true);
         } catch (error) {
+            setSuccessMessage(undefined);
             setErrorMessage((error as Error).message);
         }
     }
@@ -118,7 +71,7 @@ function App() {
             'href',
             'data:text/plain;charset=utf-8,' + encodeURIComponent(processedDestinationFileText)
         );
-        element.setAttribute('download', 'target.mml');
+        element.setAttribute('download', destinationFile?.name ?? 'destination.mml');
 
         element.style.display = 'none';
         document.body.appendChild(element);
@@ -134,17 +87,17 @@ function App() {
                     href="https://github.com/wcoots/mml-draw-order-sync-tool"
                     target="_blank"
                     rel="noreferrer">
-                    GitHub
+                    <img src="github.svg" alt="My Happy SVG" />
                 </a>
             </div>
             <div className="sub-container">
                 <div className="upload">
                     <b>Source file</b>
-                    {FileUploadSingle(setSourceFile)}
+                    {FileUpload(setSourceFile)}
                 </div>
                 <div className="upload">
                     <b>Destination file</b>
-                    {FileUploadSingle(setDestinationFile)}
+                    {FileUpload(setDestinationFile)}
                 </div>
             </div>
             <hr className="divider" />
@@ -153,9 +106,10 @@ function App() {
                     className="action-button"
                     onClick={async () => await processFiles()}
                     disabled={!filesProcessable}>
-                    Merge files
+                    Sync files
                 </button>
-                {errorMessage ? <b className="error-text">{errorMessage}</b> : <span />}
+                {successMessage ? <b className="success-text">{successMessage}</b> : null}
+                {errorMessage ? <b className="error-text">{errorMessage}</b> : null}
                 <button
                     className="action-button"
                     onClick={downloadProcessedFile}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import FileUploadSingle from './FileUploadSingle';
-import './App.css';
+import './index.css';
 
 type BaseFileDictionary = { identifier: string; value: string }[];
 
@@ -18,6 +18,19 @@ function App() {
     const [filesProcessable, setFilesProcessable] = useState(false);
     const [fileProcessError, setFileProcessError] = useState<string>();
     const [fileDownloadable, setFileDownloadable] = useState(false);
+
+    useEffect(() => {
+        if (baseFile && targetFile) {
+            if (baseFile.name.endsWith('.mml') && targetFile.name.endsWith('.mml')) {
+                setFilesProcessable(true);
+                setFileProcessError(undefined);
+            } else {
+                setFileProcessError('Unrecongnised file type');
+                setFilesProcessable(false);
+                setFileDownloadable(false);
+            }
+        }
+    }, [baseFile, targetFile]);
 
     function processBaseFile(fileText: string): BaseFileDictionary {
         const fileTextByLine = fileText.split('\n');
@@ -68,24 +81,6 @@ function App() {
         setProcessedTargetFileText(processedFileText);
     }
 
-    function downloadProcessedFile() {
-        if (!processedTargetFileText) {
-            return;
-        }
-
-        const element = document.createElement('a');
-        element.setAttribute(
-            'href',
-            'data:text/plain;charset=utf-8,' + encodeURIComponent(processedTargetFileText)
-        );
-        element.setAttribute('download', 'target.mml');
-
-        element.style.display = 'none';
-        document.body.appendChild(element);
-        element.click();
-        document.body.removeChild(element);
-    }
-
     async function processFiles() {
         try {
             setFileDownloadable(false);
@@ -110,18 +105,23 @@ function App() {
         }
     }
 
-    useEffect(() => {
-        if (baseFile && targetFile) {
-            if (baseFile.name.endsWith('.mml') && targetFile.name.endsWith('.mml')) {
-                setFilesProcessable(true);
-                setFileProcessError(undefined);
-            } else {
-                setFileProcessError('Unrecongnised file type');
-                setFilesProcessable(false);
-                setFileDownloadable(false);
-            }
+    function downloadProcessedFile() {
+        if (!processedTargetFileText) {
+            return;
         }
-    }, [baseFile, targetFile]);
+
+        const element = document.createElement('a');
+        element.setAttribute(
+            'href',
+            'data:text/plain;charset=utf-8,' + encodeURIComponent(processedTargetFileText)
+        );
+        element.setAttribute('download', 'target.mml');
+
+        element.style.display = 'none';
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+    }
 
     return (
         <div className="App">

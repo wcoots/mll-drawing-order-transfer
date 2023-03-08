@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import FileUploadSingle from './FileUploadSingle';
 import './index.css';
 
-type BaseFileDictionary = { identifier: string; value: string }[];
+type SourceFileDictionary = { identifier: string; value: string }[];
 
 const csfRowPattern =
     /<CSFFILE[0-9]+>[0-9,.]+&quot;.*\.CSF&quot;.*&quot;.*\.jsf&quot;.*&quot;.*&quot;,[0-9]+,[0-9]+<\/CSFFILE[0-9]+>/;
@@ -11,37 +11,37 @@ const csfIdentifierPattern = /[A-Z_.0-9]+\.jsf/;
 const csfValuePattern = /,[0-9]+<\/CSFFILE/;
 
 function App() {
-    const [baseFile, setBaseFile] = useState<File>();
-    const [targetFile, setTargetFile] = useState<File>();
-    const [processedTargetFileText, setProcessedTargetFileText] = useState<string>();
+    const [sourceFile, setSourceFile] = useState<File>();
+    const [destinationFile, setDestinationFile] = useState<File>();
+    const [processedDestinationFileText, setProcessedDestinationFileText] = useState<string>();
 
     const [filesProcessable, setFilesProcessable] = useState(false);
-    const [fileProcessError, setFileProcessError] = useState<string>();
     const [fileDownloadable, setFileDownloadable] = useState(false);
 
+    const [errorMessage, setErrorMessage] = useState<string>();
     useEffect(() => {
-        if (baseFile && targetFile) {
-            if (baseFile.name.endsWith('.mml') && targetFile.name.endsWith('.mml')) {
+        if (sourceFile && destinationFile) {
+            if (sourceFile.name.endsWith('.mml') && destinationFile.name.endsWith('.mml')) {
                 setFilesProcessable(true);
-                setFileProcessError(undefined);
                 setFileDownloadable(false);
+                setErrorMessage(undefined);
             } else {
-                setFileProcessError('Unrecongnised file type');
                 setFilesProcessable(false);
                 setFileDownloadable(false);
+                setErrorMessage('Unrecongnised file type');
             }
         }
-    }, [baseFile, targetFile]);
+    }, [sourceFile, destinationFile]);
 
-    function processBaseFile(fileText: string): BaseFileDictionary {
+    function processSourceFile(fileText: string): SourceFileDictionary {
         const fileTextByLine = fileText.split('\n');
 
-        return fileTextByLine.reduce((baseFileDictionary: BaseFileDictionary, line) => {
+        return fileTextByLine.reduce((sourceFileDictionary: SourceFileDictionary, line) => {
             const isRecognisedCsfRow = csfRowPattern.test(line);
 
             if (!isRecognisedCsfRow) {
                 if (line.includes('<CSFFILE')) throw new Error('Unrecognised CSF row pattern');
-                else return baseFileDictionary;
+                else return sourceFileDictionary;
             }
 
             // @ts-ignore
@@ -52,11 +52,11 @@ function App() {
 
             const value = valueSection.replace(/[^0-9]/g, '');
 
-            return [...baseFileDictionary, { identifier, value }];
+            return [...sourceFileDictionary, { identifier, value }];
         }, []);
     }
 
-    function processTargetFile(fileText: string, baseFileDictionary: BaseFileDictionary) {
+    function processDestionationFile(fileText: string, sourceFileDictionary: SourceFileDictionary) {
         const fileTextByLine = fileText.split('\n');
 
         const processedFileText = fileTextByLine
@@ -71,50 +71,52 @@ function App() {
                 // @ts-ignore
                 const [identifier] = csfIdentifierPattern.exec(line);
 
-                const baseFileRow = baseFileDictionary.find((row) => row.identifier === identifier);
+                const sourceFileRow = sourceFileDictionary.find(
+                    (row) => row.identifier === identifier
+                );
 
-                if (!baseFileRow) return line;
+                if (!sourceFileRow) return line;
 
-                return line.replace(/,[0-9]+<\/CSFFILE/, `,${baseFileRow.value}</CSFFILE`);
+                return line.replace(/,[0-9]+<\/CSFFILE/, `,${sourceFileRow.value}</CSFFILE`);
             })
             .join('\n');
 
-        setProcessedTargetFileText(processedFileText);
+        setProcessedDestinationFileText(processedFileText);
     }
 
     async function processFiles() {
         try {
             setFileDownloadable(false);
-            setFileProcessError(undefined);
+            setErrorMessage(undefined);
 
-            if (!baseFile || !targetFile) {
+            if (!sourceFile || !destinationFile) {
                 setFilesProcessable(false);
                 return;
             }
 
-            const [baseFileText, targetFileText] = await Promise.all([
-                baseFile.text(),
-                targetFile.text()
+            const [sourceFileText, destinationFileText] = await Promise.all([
+                sourceFile.text(),
+                destinationFile.text()
             ]);
 
-            const baseFileDictionary = processBaseFile(baseFileText);
+            const sourceFileDictionary = processSourceFile(sourceFileText);
 
-            processTargetFile(targetFileText, baseFileDictionary);
+            processDestionationFile(destinationFileText, sourceFileDictionary);
             setFileDownloadable(true);
         } catch (error) {
-            setFileProcessError((error as Error).message);
+            setErrorMessage((error as Error).message);
         }
     }
 
     function downloadProcessedFile() {
-        if (!processedTargetFileText) {
+        if (!processedDestinationFileText) {
             return;
         }
 
         const element = document.createElement('a');
         element.setAttribute(
             'href',
-            'data:text/plain;charset=utf-8,' + encodeURIComponent(processedTargetFileText)
+            'data:text/plain;charset=utf-8,' + encodeURIComponent(processedDestinationFileText)
         );
         element.setAttribute('download', 'target.mml');
 
@@ -127,9 +129,9 @@ function App() {
     return (
         <div className="container">
             <div className="header">
-                <b>.mml file draw order transfer tool</b>
+                <b>.mml file draw order sync tool</b>
                 <a
-                    href="https://github.com/wcoots/mml-draw-order-transfer-tool"
+                    href="https://github.com/wcoots/mml-draw-order-sync-tool"
                     target="_blank"
                     rel="noreferrer">
                     GitHub
@@ -137,12 +139,12 @@ function App() {
             </div>
             <div className="sub-container">
                 <div className="upload">
-                    <b>Base file</b>
-                    {FileUploadSingle(setBaseFile)}
+                    <b>Source file</b>
+                    {FileUploadSingle(setSourceFile)}
                 </div>
                 <div className="upload">
-                    <b>Target file</b>
-                    {FileUploadSingle(setTargetFile)}
+                    <b>Destination file</b>
+                    {FileUploadSingle(setDestinationFile)}
                 </div>
             </div>
             <hr className="divider" />
@@ -153,7 +155,7 @@ function App() {
                     disabled={!filesProcessable}>
                     Merge files
                 </button>
-                {fileProcessError ? <b className="error-text">{fileProcessError}</b> : <span />}
+                {errorMessage ? <b className="error-text">{errorMessage}</b> : <span />}
                 <button
                     className="action-button"
                     onClick={downloadProcessedFile}

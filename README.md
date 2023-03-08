@@ -1,4 +1,4 @@
-# .mml file draw order transfer tool
+# .mml file draw order sync tool
 
 -   `npm start` - run the app in the development mode.
 -   `npm run build`- build the app for production.
